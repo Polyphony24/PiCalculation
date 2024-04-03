@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"math/big"
+	"os"
+	"strconv"
 	"sync"
 )
 
@@ -14,8 +16,11 @@ var wg = sync.WaitGroup{}
 // channel is used to send information between goroutines
 var channel = make(chan *big.Float)
 
-var iterations = 2500
-var precision = 40000
+// 1 - 50
+// 
+var desired_decimals, _ = strconv.Atoi(os.Args[1])
+var iterations = desired_decimals / 14
+var precision = iterations * 50
 
 func main() {
 	pi := new(big.Float).SetPrec(uint(precision))
@@ -23,22 +28,18 @@ func main() {
 
 	for i := 0; i < iterations; i++ {
 		go chudnovsky(i)
-	}
-
-	for i := 0; i < iterations; i++ {
 		pi.Add(pi, <-channel)
 	}
 
 	wg.Wait()
-
-	//fmt.Println(pi)
 
 	numerator := big.NewFloat(10_005).SetPrec(uint(precision))
 	numerator.Sqrt(numerator)
 	numerator.Mul(numerator, big.NewFloat(426_880))
 	pi = numerator.Quo(numerator, pi)
 	
-	fmt.Printf("%1.15000%d", pi)
+	str := "%0." + strconv.Itoa(desired_decimals) + "v\n"
+	fmt.Printf(str, pi)
 }
 
 func chudnovsky(i int) {
