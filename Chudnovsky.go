@@ -2,13 +2,11 @@ package main
 
 import (
 	"fmt"
-	"math/big"
 	"os"
 	"strconv"
+	"math/big"
 	"sync"
 )
-
-var const1 = big.NewFloat(13_591_409)
 
 // wg is used to wait for the program to finish.
 var wg = sync.WaitGroup{}
@@ -16,19 +14,21 @@ var wg = sync.WaitGroup{}
 // channel is used to send information between goroutines
 var channel = make(chan *big.Float)
 
-// 1 - 50
-// 
 var desired_decimals, _ = strconv.Atoi(os.Args[1])
 var iterations = desired_decimals / 14
 var precision = iterations * 50
+var const1 = big.NewFloat(13_591_409)
 
 func main() {
 	pi := new(big.Float).SetPrec(uint(precision))
-	wg.Add(iterations)
+	wg.Add(2 * iterations)
 
 	for i := 0; i < iterations; i++ {
 		go chudnovsky(i)
-		pi.Add(pi, <-channel)
+		go func() {
+			defer wg.Done()
+			pi.Add(pi, <-channel)
+		}()
 	}
 
 	wg.Wait()
