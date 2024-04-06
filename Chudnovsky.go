@@ -2,9 +2,9 @@ package main
 
 import (
 	"fmt"
+	"math/big"
 	"os"
 	"strconv"
-	"math/big"
 	"sync"
 )
 
@@ -17,10 +17,10 @@ var channel = make(chan *big.Float, iterations)
 var desired_decimals, _ = strconv.Atoi(os.Args[1])
 var iterations = desired_decimals / 14
 var precision = iterations * 50
-var const1 = big.NewFloat(13_591_409)
+var const1 = big.NewInt(13_591_409)
 
 func main() {
-	pi := new(big.Float).SetPrec(uint(precision))
+	sum := new(big.Float).SetPrec(uint(precision))
 
 	for i := 0; i < iterations; i++ {
 		wg.Add(1)
@@ -32,64 +32,47 @@ func main() {
 
 	wg.Wait()
 	for i := 0; i < iterations; i++ {
-		pi.Add(pi, <-channel)
+		sum.Add(sum, <-channel)
 	}
 	close(channel)
 
 	numerator := big.NewFloat(10_005).SetPrec(uint(precision))
 	numerator.Sqrt(numerator)
 	numerator.Mul(numerator, big.NewFloat(426_880))
-	pi = numerator.Quo(numerator, pi)
-	
-	str := "%0." + strconv.Itoa(desired_decimals) + "v\n"
-	fmt.Printf(str, pi)
+	pi := numerator.Quo(numerator, sum)
+
+	fmt.Println(pi)
 }
 
-func chudnovsky(i int) {
-	temp := big.NewFloat(545_140_134).SetPrec(uint(precision))
-	temp.Mul(temp, big.NewFloat(float64(i)))
+func chudnovsky(k int) {
+
+	temp := big.NewInt(545_140_134)
+	temp.Mul(temp, big.NewInt(int64(k)))
 	temp.Add(temp, const1)
 
-	numerator := new(big.Float).SetPrec(uint(precision))
-	numerator = numerator.Mul(factorial(6*i), temp)
+	int_numerator := new(big.Int)
+	int_numerator = int_numerator.Mul(factorial(6*k), temp)
 
-	denominator := new(big.Float).SetPrec(uint(precision))
-	denominator.Mul(factorial(3*i), cube(factorial(i)))
-	denominator.Mul(denominator, power(640_320, 3*i))
+	int_denominator := new(big.Int)
+	int_denominator.Mul(factorial(3*k), new(big.Int).Exp(factorial(k), big.NewInt(3), nil))
+	int_denominator.Mul(int_denominator, new(big.Int).Exp(big.NewInt(640_320), big.NewInt(int64(3*k)), nil))
+
+	denominator := new(big.Float).SetInt(int_denominator).SetPrec(uint(precision))
+	numerator := new(big.Float).SetInt(int_numerator).SetPrec(uint(precision))
+
 	denominator.Quo(numerator, denominator)
 
-	if i%2 == 0 {
+	if k%2 == 0 {
 		channel <- denominator
 	} else {
 		channel <- denominator.Neg(denominator)
 	}
 }
 
-func factorial(n int) *big.Float {
+func factorial(n int) *big.Int {
 	if n <= 1 {
-		return big.NewFloat(1).SetPrec(uint(precision))
+		return big.NewInt(1)
 	}
-	result := big.NewFloat(float64(n)).SetPrec(uint(precision))
+	result := big.NewInt(int64(n))
 	return result.Mul(result, factorial(n-1))
-}
-
-func cube(x *big.Float) *big.Float {
-	// Create a new big.Float for the cube
-	cubed := new(big.Float).SetPrec(uint(precision))
-
-	// Cube the value by multiplying it by itself three times
-	cubed.Mul(x, x)
-	cubed.Mul(cubed, x)
-
-	return cubed
-}
-
-func power(x float64, y int) *big.Float {
-	z := big.NewFloat(x).SetPrec(uint(precision))
-	result := big.NewFloat(1).SetPrec(uint(precision))
-	for y > 0 {
-		result.Mul(result, z)
-		y--
-	}
-	return result
 }
