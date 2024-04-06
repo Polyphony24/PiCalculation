@@ -12,7 +12,7 @@ import (
 var wg = sync.WaitGroup{}
 
 // channel is used to send information between goroutines
-var channel = make(chan *big.Float)
+var channel = make(chan *big.Float, iterations)
 
 var desired_decimals, _ = strconv.Atoi(os.Args[1])
 var iterations = desired_decimals / 14
@@ -21,17 +21,20 @@ var const1 = big.NewFloat(13_591_409)
 
 func main() {
 	pi := new(big.Float).SetPrec(uint(precision))
-	wg.Add(2 * iterations)
 
 	for i := 0; i < iterations; i++ {
-		go chudnovsky(i)
-		go func() {
+		wg.Add(1)
+		go func(i int) {
 			defer wg.Done()
-			pi.Add(pi, <-channel)
-		}()
+			chudnovsky(i)
+		}(i)
 	}
 
 	wg.Wait()
+	for i := 0; i < iterations; i++ {
+		pi.Add(pi, <-channel)
+	}
+	close(channel)
 
 	numerator := big.NewFloat(10_005).SetPrec(uint(precision))
 	numerator.Sqrt(numerator)
@@ -43,8 +46,6 @@ func main() {
 }
 
 func chudnovsky(i int) {
-	defer wg.Done()
-
 	temp := big.NewFloat(545_140_134).SetPrec(uint(precision))
 	temp.Mul(temp, big.NewFloat(float64(i)))
 	temp.Add(temp, const1)
