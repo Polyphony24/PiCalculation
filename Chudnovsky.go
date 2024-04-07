@@ -4,8 +4,9 @@ import (
 	"fmt"
 	"math/big"
 	"os"
-	"strconv"
 	"sync"
+	"strconv"
+	"time"
 )
 
 // wg is used to wait for the program to finish.
@@ -29,44 +30,40 @@ var precision = iterations * 50
 var const1 = big.NewInt(13_591_409)
 
 func main() {
+	start := time.Now()
 	// sum is the sum which we are parallelizing
 	sum := new(big.Float).SetPrec(uint(precision))
 
 	for i := 0; i < iterations; i++ {
+		wg.Add(1)
 		// add a goroutine to the waitgroup
 		// and call the go routine
-		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
 			chudnovsky(i)
 		}(i)
 
-		// add to the sum from that goroutine (cannot be done in parallel bc of race conditions)
-		sum.Add(sum, <-channel)
-
-		// occationally print out how many digits we have so far
-		if i%1000 == 0 {
-			numerator := big.NewFloat(10_005).SetPrec(uint(precision))
-			numerator.Sqrt(numerator)
-			numerator.Mul(numerator, big.NewFloat(426_880))
-			pi := numerator.Quo(numerator, sum)
-
-			fmt.Println(pi)
-			fmt.Println()
-		}
 	}
+
+	for i := 0; i < iterations; i++ {
+		sum.Add(sum, <-channel)
+	}
+
 	// close the channel
 	close(channel)
 
-	fmt.Println("Final:")
-	fmt.Println()
+	wg.Wait()
+
 	numerator := big.NewFloat(10_005).SetPrec(uint(precision))
 	numerator.Sqrt(numerator)
 	numerator.Mul(numerator, big.NewFloat(426_880))
 
 	pi := numerator.Quo(numerator, sum)
 
+	endTime := time.Now().Sub(start)
+
 	fmt.Println(pi)
+	fmt.Println(endTime)
 }
 
 func chudnovsky(k int) {
@@ -103,9 +100,9 @@ func chudnovsky(k int) {
 
 // pretty fuckin self explanatory
 func factorial(n int) *big.Int {
-	if n <= 1 {
-		return big.NewInt(1)
+	result := big.NewInt(1)
+	for i := 1; i < n; i++ {
+		result.Mul(result, big.NewInt(int64(i)))
 	}
-	result := big.NewInt(int64(n))
-	return result.Mul(result, factorial(n-1))
+	return result
 }
