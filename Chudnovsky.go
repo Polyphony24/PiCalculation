@@ -31,6 +31,7 @@ var const1 = big.NewInt(13_591_409)
 
 func main() {
 	start := time.Now()
+	// wait one sec
 	// sum is the sum which we are parallelizing
 	sum := new(big.Float).SetPrec(uint(precision))
 
