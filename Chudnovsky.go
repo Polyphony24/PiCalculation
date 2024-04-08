@@ -36,6 +36,7 @@ func main() {
 	sum := new(big.Float).SetPrec(uint(precision))
 
 	for i := 0; i < iterations; i++ {
+		fmt.Println(i, factorial(i))
 		wg.Add(1)
 		// add a goroutine to the waitgroup
 		// and call the go routine
@@ -102,7 +103,7 @@ func chudnovsky(k int) {
 // pretty fuckin self explanatory
 func factorial(n int) *big.Int {
 	result := big.NewInt(1)
-	for i := 1; i < n; i++ {
+	for i := 1; i < n+1; i++ {
 		result.Mul(result, big.NewInt(int64(i)))
 	}
 	return result
