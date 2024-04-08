@@ -6,8 +6,7 @@ import (
 	"os"
 	"sync"
 	"strconv"
-	"time"
-)
+	"time")
 
 // wg is used to wait for the program to finish.
 var wg = sync.WaitGroup{}
@@ -36,7 +35,6 @@ func main() {
 	sum := new(big.Float).SetPrec(uint(precision))
 
 	for i := 0; i < iterations; i++ {
-		fmt.Println(i, factorial(i))
 		wg.Add(1)
 		// add a goroutine to the waitgroup
 		// and call the go routine
