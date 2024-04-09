@@ -4,9 +4,12 @@ import (
 	"fmt"
 	"math/big"
 	"os"
-	"sync"
 	"strconv"
-	"time")
+	"sync"
+	"time"
+)
+
+var lock sync.Mutex
 
 // wg is used to wait for the program to finish.
 var wg = sync.WaitGroup{}
@@ -34,25 +37,38 @@ func main() {
 	// sum is the sum which we are parallelizing
 	sum := new(big.Float).SetPrec(uint(precision))
 
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		i := 0
+		for i < iterations {
+			select {
+			case data, ok := <-channel:
+				if ok {
+					i++
+					sum.Add(sum, data)
+				}
+			default:
+				time.Sleep(time.Second) // Wait before checking again
+			}
+		}
+	}()
+
 	for i := 0; i < iterations; i++ {
-		wg.Add(1)
 		// add a goroutine to the waitgroup
 		// and call the go routine
+		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			chudnovsky(i)
+			res := chudnovsky(i)
+			channel <- res
 		}(i)
 
 	}
 
-	for i := 0; i < iterations; i++ {
-		sum.Add(sum, <-channel)
-	}
-
+	wg.Wait()
 	// close the channel
 	close(channel)
-
-	wg.Wait()
 
 	numerator := big.NewFloat(10_005).SetPrec(uint(precision))
 	numerator.Sqrt(numerator)
@@ -66,7 +82,7 @@ func main() {
 	fmt.Println(endTime)
 }
 
-func chudnovsky(k int) {
+func chudnovsky(k int) *big.Float {
 	// start with big.Ints because ints are faster and they are all integers in the fraction
 	temp := big.NewInt(545_140_134)
 	temp.Mul(temp, big.NewInt(int64(k)))
@@ -92,9 +108,9 @@ func chudnovsky(k int) {
 
 	// return the result to the channel
 	if k%2 == 0 {
-		channel <- denominator
+		return denominator
 	} else {
-		channel <- denominator.Neg(denominator)
+		return denominator.Neg(denominator)
 	}
 }
 
