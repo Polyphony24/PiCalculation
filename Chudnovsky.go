@@ -9,8 +9,6 @@ import (
 	"time"
 )
 
-var lock sync.Mutex
-
 // wg is used to wait for the program to finish.
 var wg = sync.WaitGroup{}
 
@@ -37,23 +35,6 @@ func main() {
 	// sum is the sum which we are parallelizing
 	sum := new(big.Float).SetPrec(uint(precision))
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		i := 0
-		for i < iterations {
-			select {
-			case data, ok := <-channel:
-				if ok {
-					i++
-					sum.Add(sum, data)
-				}
-			default:
-				time.Sleep(time.Second) // Wait before checking again
-			}
-		}
-	}()
-
 	for i := 0; i < iterations; i++ {
 		// add a goroutine to the waitgroup
 		// and call the go routine
@@ -66,6 +47,11 @@ func main() {
 
 	}
 
+	for i := 0; i < iterations; i++ {
+		sum.Add(sum, <-channel)
+	}
+
+	// wait until all iterations are done
 	wg.Wait()
 	// close the channel
 	close(channel)
