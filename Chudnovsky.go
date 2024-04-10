@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/big"
 	"os"
+	"runtime"
 	"strconv"
 	"sync"
 	"time"
@@ -29,31 +30,38 @@ var precision = iterations * 50
 // global variable so we don't have to calculate it everytime
 var const1 = big.NewInt(13_591_409)
 
-func main() {
-	start := time.Now()
-	// wait one sec
-	// sum is the sum which we are parallelizing
-	sum := new(big.Float).SetPrec(uint(precision))
+var sum = new(big.Float).SetPrec(uint(precision))
 
-	for i := 0; i < iterations; i++ {
+var lock = sync.Mutex{}
+
+func main() {
+
+	start := time.Now()
+	// sum is the sum which we are parallelizing
+
+	i := 0
+	for i < iterations {
 		// add a goroutine to the waitgroup
 		// and call the go routine
-		wg.Add(1)
-		go func(i int) {
-			defer wg.Done()
-			res := chudnovsky(i)
-			channel <- res
-		}(i)
-
+		if runtime.NumGoroutine() < runtime.NumCPU() {
+			wg.Add(1)
+			go func(i int) {
+				defer wg.Done()
+				chudnovsky(i)
+			}(i)
+			i++
+		}
 	}
 
+	/*
 	for i := 0; i < iterations; i++ {
 		sum.Add(sum, <-channel)
 	}
+	*/
 
 	// wait until all iterations are done
-	wg.Wait()
 	// close the channel
+	wg.Wait()
 	close(channel)
 
 	numerator := big.NewFloat(10_005).SetPrec(uint(precision))
@@ -68,7 +76,7 @@ func main() {
 	fmt.Println(endTime)
 }
 
-func chudnovsky(k int) *big.Float {
+func chudnovsky(k int) {
 	// start with big.Ints because ints are faster and they are all integers in the fraction
 	temp := big.NewInt(545_140_134)
 	temp.Mul(temp, big.NewInt(int64(k)))
@@ -76,28 +84,24 @@ func chudnovsky(k int) *big.Float {
 
 	// numerator of the sum
 	// (6k)!(545,140,134k + 13,591,409)
-	int_numerator := new(big.Int)
-	int_numerator = int_numerator.Mul(factorial(6*k), temp)
+	numerator := new(big.Int)
+	numerator = numerator.Mul(factorial(6*k), temp)
 
 	// denominator of the sum
 	// (3k)!(k!)^3(640320)^3k
-	int_denominator := new(big.Int)
-	int_denominator.Mul(factorial(3*k), new(big.Int).Exp(factorial(k), big.NewInt(3), nil))
-	int_denominator.Mul(int_denominator, new(big.Int).Exp(big.NewInt(640_320), big.NewInt(int64(3*k)), nil))
+	denominator := new(big.Int)
+	denominator.Mul(factorial(3*k), new(big.Int).Exp(factorial(k), big.NewInt(3), nil))
+	denominator.Mul(denominator, new(big.Int).Exp(big.NewInt(640_320), big.NewInt(int64(3*k)), nil))
 
-	// then convert to floats with the required precision
-	denominator := new(big.Float).SetInt(int_denominator).SetPrec(uint(precision))
-	numerator := new(big.Float).SetInt(int_numerator).SetPrec(uint(precision))
-
-	// divide them
-	denominator.Quo(numerator, denominator)
+	fraction := new(big.Float).Quo(new(big.Float).SetPrec(uint(precision)).SetInt(numerator), new(big.Float).SetPrec(uint(precision)).SetInt(denominator))
 
 	// return the result to the channel
-	if k%2 == 0 {
-		return denominator
-	} else {
-		return denominator.Neg(denominator)
+	if k%2 == 1 {
+		fraction.Neg(fraction)
 	}
+	lock.Lock()
+	sum.Add(sum, fraction)
+	lock.Unlock()
 }
 
 // pretty fuckin self explanatory
