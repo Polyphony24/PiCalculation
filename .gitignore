@@ -8,3 +8,6 @@ test
 test2
 tst
 *.tmp
+*.sh
+ChudnovskySlow
+

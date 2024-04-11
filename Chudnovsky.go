@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"math/big"
 	"os"
-	"runtime"
 	"strconv"
 	"sync"
 	"time"
@@ -32,36 +31,28 @@ var const1 = big.NewInt(13_591_409)
 
 var sum = new(big.Float).SetPrec(uint(precision))
 
-var lock = sync.Mutex{}
-
 func main() {
 
 	start := time.Now()
 	// sum is the sum which we are parallelizing
 
-	i := 0
-	for i < iterations {
+	for i := 0; i < iterations; i++ {
 		// add a goroutine to the waitgroup
 		// and call the go routine
-		if runtime.NumGoroutine() < runtime.NumCPU() {
-			wg.Add(1)
-			go func(i int) {
-				defer wg.Done()
-				chudnovsky(i)
-			}(i)
-			i++
-		}
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			chudnovsky(i)
+		}(i)
 	}
 
-	/*
 	for i := 0; i < iterations; i++ {
 		sum.Add(sum, <-channel)
 	}
-	*/
 
 	// wait until all iterations are done
-	// close the channel
 	wg.Wait()
+	// close the channel
 	close(channel)
 
 	numerator := big.NewFloat(10_005).SetPrec(uint(precision))
@@ -69,10 +60,10 @@ func main() {
 	numerator.Mul(numerator, big.NewFloat(426_880))
 
 	pi := numerator.Quo(numerator, sum)
-
+	pi.Neg(pi)
 	endTime := time.Now().Sub(start)
 
-	fmt.Println(pi)
+	//fmt.Println(pi)
 	fmt.Println(endTime)
 }
 
@@ -99,9 +90,8 @@ func chudnovsky(k int) {
 	if k%2 == 1 {
 		fraction.Neg(fraction)
 	}
-	lock.Lock()
-	sum.Add(sum, fraction)
-	lock.Unlock()
+
+	channel <- fraction
 }
 
 // pretty fuckin self explanatory
