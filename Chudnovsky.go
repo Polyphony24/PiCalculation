@@ -1,3 +1,8 @@
+/************************************
+* program that implements the Chudnovsky
+* algorithm for computing PI in parallel
+* on shared memory
+**************************************/
 package main
 
 import (
@@ -9,32 +14,34 @@ import (
 	"time"
 )
 
-// wg is used to wait for the program to finish.
-var wg = sync.WaitGroup{}
+// these are global vars (yes I know it's a bad idea but the code is pretty short so idc)
+var (
+	// wg is used to wait for the program to finish.
+	wg = sync.WaitGroup{}
 
-// channel is used to send information between goroutines
-var channel = make(chan *big.Float, iterations)
+	// channel is used to send information between goroutines
+	channel = make(chan *big.Float, iterations)
 
-// input is desired_decimals i.e. ./Chudnovsky 100 will print out 100 decimals
-var desired_decimals, _ = strconv.Atoi(os.Args[1])
+	// input is desired_decimals i.e. ./Chudnovsky 100 will print out 100 decimals
+	desired_decimals, _ = strconv.Atoi(os.Args[1])
 
-// each iteration makes minimum 14 decimals
-var iterations = desired_decimals / 14
+	// each iteration makes minimum 14 decimals
+	iterations = desired_decimals / 14
 
-// this is just a number that seems to work
-// may be able to lower it for speedup in some situations (not sure)
-var precision = iterations * 50
+	// this is just a number that seems to work
+	// if I lower it I lose precision of the final result (this may be optimizable but not easily)
+	precision = iterations * 50
 
-// const1 is just a value used in each sum
-// global variable so we don't have to calculate it everytime
-var const1 = big.NewInt(13_591_409)
-
-var sum = new(big.Float).SetPrec(uint(precision))
+	// const1 is just a value used in each sum
+	// global variable so we don't have to calculate it everytime
+	const1 = big.NewInt(13_591_409)
+)
 
 func main() {
-
 	start := time.Now()
+
 	// sum is the sum which we are parallelizing
+	sum := new(big.Float).SetPrec(uint(precision))
 
 	for i := 0; i < iterations; i++ {
 		// add a goroutine to the waitgroup
@@ -42,7 +49,7 @@ func main() {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			chudnovsky(i)
+			channel <- chudnovsky(i)
 		}(i)
 	}
 
@@ -55,19 +62,21 @@ func main() {
 	// close the channel
 	close(channel)
 
+	// extra math to be done on the sum afterwards
 	numerator := big.NewFloat(10_005).SetPrec(uint(precision))
 	numerator.Sqrt(numerator)
 	numerator.Mul(numerator, big.NewFloat(426_880))
 
 	pi := numerator.Quo(numerator, sum)
-	pi.Neg(pi)
 	endTime := time.Now().Sub(start)
 
-	//fmt.Println(pi)
-	fmt.Println(endTime)
+	fmt.Println(pi)
+	fmt.Println(pi.Prec(), "digits of precision in", iterations, "iterations in:", endTime)
 }
 
-func chudnovsky(k int) {
+// function that calculates the kth iteration
+// of the chudnovsky sum
+func chudnovsky(k int) *big.Float {
 	// start with big.Ints because ints are faster and they are all integers in the fraction
 	temp := big.NewInt(545_140_134)
 	temp.Mul(temp, big.NewInt(int64(k)))
@@ -86,15 +95,16 @@ func chudnovsky(k int) {
 
 	fraction := new(big.Float).Quo(new(big.Float).SetPrec(uint(precision)).SetInt(numerator), new(big.Float).SetPrec(uint(precision)).SetInt(denominator))
 
-	// return the result to the channel
 	if k%2 == 1 {
 		fraction.Neg(fraction)
 	}
 
-	channel <- fraction
+	// return the result to the channel
+	return fraction
 }
 
-// pretty fuckin self explanatory
+// function that calculates the factorial 
+// and returns a big.Int
 func factorial(n int) *big.Int {
 	result := big.NewInt(1)
 	for i := 1; i < n+1; i++ {
